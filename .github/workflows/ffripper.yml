@@ -11,38 +11,40 @@ jobs:
   build:
     name: Free Fire Ripper Lab Running
     runs-on: windows-latest
-    timeout-minutes: 99999
+    timeout-minutes: 360
 
     steps:
+    - name: Checkout RDP-FILE-SAVE repo
+      uses: actions/checkout@v3
+      with:
+        repository: gringomodz/RDP-FILE-SAVE
+        token: ${{ secrets.GH_TOKEN }}
+        path: savefiles
+
+    - name: Restore previous data
+      run: |
+        Copy-Item -Path savefiles\* -Destination "C:\Users\${Env:USERNAME}\Documents" -Recurse -Force -ErrorAction SilentlyContinue
+
     - name: Downloading And Installing Free Fire And Tools
       continue-on-error: true
       run: |
-        # Disable firewall profiles
         & { Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False }
 
-        # Function to retry Chocolatey installations
         function Install-PackageWithRetry {
-            param (
-                [string]$packageName
-            )
-
+            param ([string]$packageName)
             $maxRetries = 3
             $retryCount = 0
             $success = $false
-
             while (-not $success -and $retryCount -lt $maxRetries) {
                 try {
                     choco install $packageName -y
                     $success = $true
                 } catch {
-                    Write-Host "Failed to install $packageName. Retrying... ($($retryCount+1)/$maxRetries)"
                     Start-Sleep -Seconds 10
                     $retryCount++
                 }
             }
-
             if (-not $success) {
-                Write-Host "Failed to install $packageName via Chocolatey. Attempting direct download..."
                 if ($packageName -eq 'googlechrome') {
                     Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile "chrome_installer.exe"
                     Start-Process "chrome_installer.exe" -ArgumentList "/silent", "/install" -Wait
@@ -53,44 +55,28 @@ jobs:
             }
         }
 
-        # Install necessary packages with retry logic
         Install-PackageWithRetry -packageName "chrome-remote-desktop-host"
         Install-PackageWithRetry -packageName "googlechrome"
 
-        # Navigate to the Documents directory
         cd C:\Users\$Env:USERNAME\Documents
-
-        # Download and extract the zip file
-        Invoke-WebRequest -Uri "https://drive.usercontent.google.com/download?id=11EUFz6hufNT1g56-CmOJw9_KxMERZxhe&export=download&authuser=0&confirm=t&uuid=157ad075-6074-4fb7-ade2-63e76e7956b7&at=APZUnTUkxLXjKC5Aliqg_3gGGgPu%3A1716557813235" -OutFile ffripper.zip
-
-        # Extract the zip file
+        Invoke-WebRequest -Uri "https://drive.usercontent.google.com/download?id=11EUFz6hufNT1g56-CmOJw9_KxMERZxhe&export=download&authuser=0&confirm=t" -OutFile ffripper.zip
         7z x ffripper.zip -y
 
-        # Check if Chrome Remote Desktop's remoting_start_host.exe exists and start it if found
         $chromeRemoteDesktopPath = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
         if (Test-Path $chromeRemoteDesktopPath) {
             & $chromeRemoteDesktopPath
-        } else {
-            Write-Host "Chrome Remote Desktop's remoting_start_host.exe not found at $chromeRemoteDesktopPath. Skipping this step."
         }
 
-        # Check if Noesis64.exe exists and start it if found
         $noesisPath = "C:\Users\$Env:USERNAME\Documents\noesis\Noesis64.exe"
         if (Test-Path $noesisPath) {
             Start-Process $noesisPath
-        } else {
-            Write-Host "Noesis64.exe not found at $noesisPath. Skipping this step."
         }
 
-        # Check if NinjaRipper.exe exists and start it if found
         $ninjaripperPath = "C:\Users\$Env:USERNAME\Documents\ninjaripper\x86\ninjaripper.exe"
         if (Test-Path $ninjaripperPath) {
             Start-Process $ninjaripperPath
-        } else {
-            Write-Host "NinjaRipper.exe not found at $ninjaripperPath. Skipping this step."
         }
 
-        # Create symbolic links
         New-Item -ItemType SymbolicLink -Target "C:\Users\$Env:USERNAME\Documents\FenixGaga\Engine\ProjectTitan.exe" -Path "C:\Users\$Env:USERNAME\Desktop\Free Fire.lnk"
         New-Item -ItemType SymbolicLink -Target "C:\Users\$Env:USERNAME\Documents\ninjaripper\x86\NinjaRipper.exe" -Path "C:\Users\$Env:USERNAME\Desktop\Ninjaripper.lnk"
         New-Item -ItemType SymbolicLink -Target "C:\Users\$Env:USERNAME\Documents\noesis\Noesis64.exe" -Path "C:\Users\$Env:USERNAME\Desktop\Noesis.lnk"
@@ -98,14 +84,24 @@ jobs:
     - name: Starting Remote Desktop
       continue-on-error: true
       run: |
-        # CONNECTING YOU WITH VM
         ${{ inputs.code }} -pin=123456
 
-    - name: Remote Desktop is Running
+    - name: Keep RDP Alive
       run: |
         $i = 360999
         do {
-            Write-Host $i
+            Write-Host "Still running: $i"
             Sleep 60
             $i--
         } while ($i -gt 0)
+
+    - name: Save working data back to repo
+      run: |
+        cd C:\Users\${Env:USERNAME}\Documents
+        git config --global user.email "rdp@github.com"
+        git config --global user.name "GitHub RDP"
+        Copy-Item * "${{ github.workspace }}\savefiles" -Recurse -Force
+        cd "${{ github.workspace }}\savefiles"
+        git add .
+        git commit -m "Auto backup after RDP session"
+        git push
