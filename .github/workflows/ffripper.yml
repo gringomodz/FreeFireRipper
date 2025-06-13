@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       code:
-        description: Paste Chrome Remote Desktop Code
+        description: Chrome Remote Desktop Code
         required: true
 
 jobs:
@@ -14,10 +14,10 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Checkout RDP-FILE-SAVE repo
+    - name: Checkout File-Save-Rdp repo
       uses: actions/checkout@v3
       with:
-        repository: gringomodz/RDP-FILE-SAVE
+        repository: gringomodz/File-Save-Rdp
         token: ${{ secrets.GH_TOKEN }}
         path: savefiles
         ref: main
