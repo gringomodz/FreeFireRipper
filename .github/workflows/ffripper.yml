@@ -20,6 +20,7 @@ jobs:
         repository: gringomodz/RDP-FILE-SAVE
         token: ${{ secrets.GH_TOKEN }}
         path: savefiles
+        ref: main
 
     - name: Restore previous data
       run: |
